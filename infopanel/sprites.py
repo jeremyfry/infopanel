@@ -47,7 +47,8 @@ class Sprite(object):  # pylint: disable=too-many-instance-attributes
                                                         'label':[255, 255, 0]}): PALLETE_SCHEMA,
                        vol.Optional('frames', default=None): FRAMES_SCHEMA,
                        vol.Optional('text', default=''): str,
-                       vol.Optional('can_flip', default=True): bool
+                       vol.Optional('can_flip', default=True): bool,
+                       vol.Optional('data_label', default=''): str
                        })
 
     def __init__(self, max_x, max_y, data_source=None):
@@ -271,6 +272,9 @@ class FancyText(Sprite):
         self.frames = [[[]]]
         self._text = []
         self._width = 0
+        self.data_label = None
+        self.value = ""
+        self.last_val = None
 
     def check_frame_bounds(self):
         """No frames, no frame delta. ."""
@@ -280,6 +284,12 @@ class FancyText(Sprite):
         conf = Sprite.apply_config(self, conf)
         if self.text:
             self.add(self.text, self.pallete['text'])
+        elif conf['data_label']:
+            # make function to get live data off of object
+            self.value = lambda: self._convert_data(self.data_source[conf['data_label']])
+            print(self.value, self.data_source)
+            self._make_text()
+
         return conf
 
     @property
@@ -311,6 +321,7 @@ class FancyText(Sprite):
 
         Can have lines that end with newline, and can have multiple colors.
         """
+        self.update_text()
         x = 0
         self.tick()
         for text, rgb in self._text:
@@ -321,13 +332,32 @@ class FancyText(Sprite):
         self._width = x
         return x
 
+    def _make_text(self):
+        """Make elements of a duration with label and text."""
+        val = self.value  # pylint: disable=not-callable
+        if val is None:
+            text = 'N/A'
+        else:
+            text = val
+        self.add(text, self.pallete['text'])
+
+    def update_text(self):
+        """Update the interpolated color if value changed."""
+        val = self.value() if callable(self.value) else self.value  # pylint: disable=not-callable
+        if val != self.last_val:
+            # only do lookup when things change for speed.
+            self.clear()
+            self._make_text()
+
+    def _convert_data(self, val):
+        return str(val)
+
 class Duration(FancyText):  # pylint:disable=too-many-instance-attributes
     """Text that represents a duration with a green-to-red color."""
 
     CONF = FancyText.CONF.extend({'label': vol.Coerce(str),
                                   vol.Optional('low_val', default=13.0):vol.Coerce(float),
                                   vol.Optional('high_val', default=23.0): vol.Coerce(float),
-                                  vol.Optional('data_label'): vol.Coerce(str),
                                   vol.Optional('label_fmt', default='{}:'): str,
                                   vol.Optional('val_fmt', default='{}'): str})
 
@@ -341,7 +371,6 @@ class Duration(FancyText):  # pylint:disable=too-many-instance-attributes
         self.value = None
         self.label_fmt = None
         self.val_fmt = None
-        self.data_label = None
         self.cmap = colors.GREEN_RED
 
     def apply_config(self, conf):
@@ -351,12 +380,6 @@ class Duration(FancyText):  # pylint:disable=too-many-instance-attributes
             self.value = lambda: self._convert_data(self.data_source[conf['data_label']])
         self._make_text()
         return conf
-
-    def _convert_data(self, val):  # pylint: disable=no-self-use
-        try:
-            return int(val)
-        except ValueError:
-            return None
 
     def _make_text(self):
         """Make elements of a duration with label and text."""
@@ -378,6 +401,12 @@ class Duration(FancyText):  # pylint:disable=too-many-instance-attributes
             # only do lookup when things change for speed.
             self.clear()
             self._make_text()
+
+    def _convert_data(self, val): #pylint: disable=no-self-use
+        try:
+            return int(val)
+        except ValueError:
+            return None
 
     def render(self, canvas):
         self.update_color()
@@ -500,6 +529,7 @@ class Image(BaseImage):
 
     def set_source_path(self, path):
         """Set this image source to a new path."""
+        LOG.debug('New image path %s', path)
         with PILImage.open(os.path.expandvars(path)) as image:
             image.thumbnail((self.max_x, self.max_y), PILImage.ANTIALIAS)
             self._image = image.convert('RGB')

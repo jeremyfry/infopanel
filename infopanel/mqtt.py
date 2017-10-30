@@ -3,6 +3,7 @@
 import logging
 
 import paho.mqtt.client as mqtt
+import json
 
 LOG = logging.getLogger(__name__)
 
@@ -23,7 +24,15 @@ class MQTTClient(object):
         """Callback for when MQTT receives a message."""
         LOG.debug("%s %s", msg.topic, str(msg.payload))
         key = msg.topic.split('/')[-1]
-        self._data_container[key] = msg.payload
+        if key == 'multi':
+            try:
+                values = json.loads(msg.payload)
+                for valueKey, value in values.iteritems():
+                    self._data_container[valueKey] = value
+            except ValueError, e:
+                LOG.debug("Bad JSON", e)
+        else:
+            self._data_container[key] = msg.payload
 
     def start(self):
         """Connect to the MQTT server."""
