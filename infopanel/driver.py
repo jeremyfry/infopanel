@@ -7,6 +7,7 @@ import random
 import logging
 import os
 import itertools
+import subprocess
 
 from infopanel import mqtt, scenes, config, display, sprites, data
 
@@ -29,6 +30,7 @@ class Driver(object):  # pylint: disable=too-many-instance-attributes
         self.sprites = {}  # name: list of sprites
         self.scenes = {}  # name: scene
         self.durations_in_s = {}  # scene: seconds
+        self.mode_after = None
         self.scene_sequence = []
         self._scene_iterator = itertools.cycle(self.scene_sequence)
         self._randomize_scenes = ON
@@ -76,6 +78,13 @@ class Driver(object):  # pylint: disable=too-many-instance-attributes
             self.display.clear()
             new_scene.reinit()
             LOG.debug('Switching to new scene: %s', new_scene)
+        else:
+            if self.mode_after:
+                LOG.debug('Swapping to mode: %s', self.mode_after)
+                self.data_source['mode'] = self.mode_after
+                self.apply_mode(self.mode_after)
+                self._change_scene()
+
         self.active_scene = new_scene
         self.interval = self.durations_in_s[self.active_scene]
 
@@ -98,6 +107,10 @@ class Driver(object):  # pylint: disable=too-many-instance-attributes
             self.change_image_path(self.data_source['image_path'])
             self.data_source['image_path'] = ''  # clear it out in anticipation of next command.
 
+        if self.data_source['sound']:
+            self.play_sound(self.data_source['sound'])
+            self.data_source['sound'] = ''
+
     def apply_mode(self, mode):
         """
         Apply a different sequence of scenes with different durations.
@@ -116,13 +129,18 @@ class Driver(object):  # pylint: disable=too-many-instance-attributes
                 return
         else:
             self.scene_sequence = []
-            for scene_name, duration in self.modes[mode]:
+            for scene_name, duration, mode_after in self.modes[mode]:
                 scene = self.scenes[scene_name]
                 self.scene_sequence.append(scene)
                 self.durations_in_s[scene] = duration
+                self.mode_after = mode_after
         self._scene_iterator = itertools.cycle(self.scene_sequence)
         self._previous_mode = self._mode  # for suspend/resume
         self._mode = mode
+
+    def play_sound(self, soundpath):
+        LOG.info('Playing sound: %s', '/home/pi/sounds/'+os.path.normpath(soundpath)+'.wav')
+        subprocess.Popen(['aplay', '-D', 'hw:1,0', '/home/pi/sounds/'+os.path.normpath(soundpath)+'.wav'])
 
     def change_image_path(self, pathsetting):
         """
@@ -155,20 +173,20 @@ class Driver(object):  # pylint: disable=too-many-instance-attributes
     def init_modes(self, conf):
         """Process modes from configuration."""
         modeconf = conf['modes']
-        self.modes[MODE_BLANK] = [(scenes.SCENE_BLANK, 2.0)]  # blank mode for suspend
+        self.modes[MODE_BLANK] = [(scenes.SCENE_BLANK, 2.0, None)]  # blank mode for suspend
 
         for mode_name, scenelist in modeconf.items():
             self.modes[mode_name] = []
             for sceneinfo in scenelist:
-                for scene_name, durationinfo in sceneinfo.items():
-                    self.modes[mode_name].append((scene_name, durationinfo['duration']))
+                for scene_name, scene_params in sceneinfo.items():
+                    self.modes[mode_name].append((scene_name, scene_params['duration'], scene_params['mode_after']))
 
         self.modes[MODE_ALL] = []  # make a default catch-all mode.
         for scene_name in self.scenes:
             if scene_name in [scenes.SCENE_BLANK]:
                 # do not randomly cycle through the special blank scene.
                 continue
-            self.modes[MODE_ALL].append((scene_name, MODE_ALL_DURATION))
+            self.modes[MODE_ALL].append((scene_name, MODE_ALL_DURATION, None))
 
         default_mode = conf['global'].get('default_mode', MODE_ALL)
         self.apply_mode(default_mode)

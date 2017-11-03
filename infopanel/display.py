@@ -8,9 +8,7 @@ except ImportError:
     print('No RGB Matrix library found. Cannot use that display.')
     RGBMatrix = None
 
-
 from infopanel import colors
-
 
 class Display(object):
     """
@@ -18,6 +16,10 @@ class Display(object):
 
     This is a common interface to whatever kind of display you have.
     """
+    def outlined_text(self, font, x, y, red, green, blue, outline_r, outline_g, outline_b, text):
+        """Render text in a font to a place on the screen in a certain color."""
+        raise NotImplementedError
+
     def text(self, font, x, y, red, green, blue, text):
         """Render text in a font to a place on the screen in a certain color."""
         raise NotImplementedError
@@ -58,16 +60,18 @@ class Display(object):
         if box:
             self.draw_box(x_orig - 2, y - font.height + 2, x, y + 2)
 
-    def draw_box(self, xmin, ymin, xmax, ymax):
+    def draw_box(self, xmin, ymin, xmax, ymax, r=0, g=200, b=0):
         """Don't use PIL because it blanks.  NOTE: Use graphics.DrawLine"""
         for x in range(xmin, xmax):
-            self.set_pixel(x, ymin, 0, 200, 0)
-            self.set_pixel(x, ymax, 0, 200, 0)
+            self.set_pixel(x, ymin, r, g, b)
+            self.set_pixel(x, ymax, r, g, b)
 
         for y in range(ymin, ymax + 1):
-            self.set_pixel(xmin, y, 0, 200, 0)
-            self.set_pixel(xmax, y, 0, 200, 0)
+            self.set_pixel(xmin, y, r, g, b)
+            self.set_pixel(xmax, y, r, g, b)
 
+    def draw_rect(self, xpos, ypos, width, height, color):
+        raise NotImplementedError
 
 class RGBMatrixDisplay(Display):
     """An RGB LED Matrix running off of the rgbmatrix library."""
@@ -75,6 +79,7 @@ class RGBMatrixDisplay(Display):
         Display.__init__(self)
         self._matrix = matrix
         self.canvas = matrix.CreateFrameCanvas()
+        self.black = graphics.Color(0, 0, 0)
 
     @property
     def width(self):
@@ -95,6 +100,21 @@ class RGBMatrixDisplay(Display):
     def brightness(self, value):
         self._matrix.brightness = value
         self.canvas.brightness = value
+
+    def draw_rect(self, xpos, ypos, width, height, color):
+        xmax = min(xpos + width, 32)
+        ymax = min(ypos + height, 32)
+        xmin = max(xpos, 0)
+        for y in range(ypos, ymax):
+            graphics.DrawLine(self.canvas, xmin, y, xmax, y, color)
+
+    def outlined_text(self, font, x, y, red, green, blue, outline_r, outline_g, outline_b, text):
+        outline_color = graphics.Color(0, 200, 0)
+        box_width = (len(text) * 5)+2
+        self.draw_rect(x - 1, y - font.height + 1, box_width, y + 2, outline_color)
+
+        color = graphics.Color(red, green, blue)  # may require caching
+        return graphics.DrawText(self.canvas, font, x, y, color, text)
 
     def text(self, font, x, y, red, green, blue, text):
         """Render text in a font to a place on the screen in a certain color."""

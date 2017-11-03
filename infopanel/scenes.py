@@ -5,6 +5,7 @@ import inspect
 import sys
 import copy
 import logging
+import voluptuous as vol
 
 from infopanel import sprites, helpers
 
@@ -13,6 +14,9 @@ SCENE_BLANK = 'blank'
 
 class Scene(object):
     """A single screen's worth of sprites."""
+    CONF = vol.Schema({vol.Optional('mode_after', default=None): str
+                       }, extra=vol.ALLOW_EXTRA)
+
     def __init__(self, width, height):
         self.width = width
         self.height = height
@@ -25,7 +29,15 @@ class Scene(object):
 
     def apply_config(self, conf, existing_sprites):
         """Apply optional extra config."""
-        pass
+        conf = self.CONF(conf)
+        for key, val in conf.items():
+            if not hasattr(self, key):
+                # this isn't a configurable attribute. May have special behavior.
+                continue
+            if getattr(self, key) is None:
+                # allow subclasses to force non-None attributes in their constructors
+                setattr(self, key, val)
+        return conf
 
     def reinit(self):
         """Called when scene comes back up on the screen."""

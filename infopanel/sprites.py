@@ -287,7 +287,6 @@ class FancyText(Sprite):
         elif conf['data_label']:
             # make function to get live data off of object
             self.value = lambda: self._convert_data(self.data_source[conf['data_label']])
-            print(self.value, self.data_source)
             self._make_text()
 
         return conf
@@ -351,6 +350,49 @@ class FancyText(Sprite):
 
     def _convert_data(self, val):
         return str(val)
+
+
+class OutlinedText(FancyText):
+
+    CONF = FancyText.CONF.extend({vol.Optional('rgb', default=[0, 0, 0]): vol.Coerce(list),
+                                  vol.Optional('orgb', default=[0, 0, 0]):vol.Coerce(list)})
+
+    def __init__(self, max_x, max_y, data_source):
+        FancyText.__init__(self, max_x, max_y, data_source=data_source)
+        self._rgb = [0, 0, 0]
+        self._orgb = [0, 0, 0]
+
+    def apply_config(self, conf):
+        conf = FancyText.apply_config(self, conf)
+        self._make_text()
+        return conf
+
+    def _make_text(self):
+        """Make elements of a duration with label and text."""
+        val = self.value  # pylint: disable=not-callable
+        if val is None:
+            text = 'N/A'
+        else:
+            text = val
+        self.add_text(text, self._rgb, self._orgb)
+
+    def add_text(self, text, color, outline_color):
+        self._text.append((text, color, outline_color))
+
+    def render(self, display):
+        self.update_text()
+        x = 0
+        self.tick()
+        for text, rgb, orgb in self._text:
+            if callable(text):
+                text = str(text())  # for dynamic values
+            r, g, b = rgb
+            out_r, out_g, out_b = orgb
+
+            x += display.outlined_text(self.font, self.x + x, self.y, r, g, b, out_r, out_g, out_b, text)
+        self._width = x
+        return x
+
 
 class Duration(FancyText):  # pylint:disable=too-many-instance-attributes
     """Text that represents a duration with a green-to-red color."""
