@@ -19,7 +19,7 @@ ON = '1'  # for MQTT processing
 OFF = '0'
 
 LOG = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.WARN)
 
 class Driver(object):  # pylint: disable=too-many-instance-attributes
     """Main controller for the infopanel."""
@@ -84,6 +84,7 @@ class Driver(object):  # pylint: disable=too-many-instance-attributes
                 self.data_source['mode'] = self.mode_after
                 self.apply_mode(self.mode_after)
                 self._change_scene()
+                return
 
         self.active_scene = new_scene
         self.interval = self.durations_in_s[self.active_scene]

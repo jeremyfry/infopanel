@@ -108,10 +108,10 @@ class RGBMatrixDisplay(Display):
         for y in range(ypos, ymax):
             graphics.DrawLine(self.canvas, xmin, y, xmax, y, color)
 
-    def outlined_text(self, font, x, y, red, green, blue, outline_r, outline_g, outline_b, text):
-        outline_color = graphics.Color(0, 200, 0)
-        box_width = (len(text) * 5)+2
-        self.draw_rect(x - 1, y - font.height + 1, box_width, y + 2, outline_color)
+    def text_with_background(self, font, x, y, red, green, blue, background_r, background_g, background_b, text):
+        background_color = graphics.Color(background_r, background_g, background_b)
+        box_width = (len(text) * 5)+1
+        self.draw_rect(x - 1, y - font.height + 1, box_width, y + 2, background_color)
 
         color = graphics.Color(red, green, blue)  # may require caching
         return graphics.DrawText(self.canvas, font, x, y, color, text)

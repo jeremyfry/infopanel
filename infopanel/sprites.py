@@ -73,6 +73,7 @@ class Sprite(object):  # pylint: disable=too-many-instance-attributes
         self._frame_delta = 0
         self.can_flip = None
         self._phrase_width = 0
+        self.init_x, self.init_y = None, None
 
     def __repr__(self):
         return ('<{} at {}, {}. dx/dy: ({}, {}), size: ({}, {})>'
@@ -257,12 +258,14 @@ class Sprite(object):  # pylint: disable=too-many-instance-attributes
                 self._phrase_width = display.text(self.font, xtext, ytext, red, green, blue, self.text)
 
     def reinit(self):
-        """
-        Perform actions when the sprite gets put back on the screen.
-        
-        You could reset position or whatever here. 
-        """
-        pass
+        if not self.init_x:
+            LOG.debug('setting x y %s %s, %s %s', self.x, self.y, self.init_x, self.init_y)
+            self.init_x = self.x
+            self.init_y = self.y
+
+        self.x = self.init_x
+        self.y = self.init_y
+
 
 class FancyText(Sprite):
     """Text with multiple colors and stuff that can move."""
@@ -352,15 +355,15 @@ class FancyText(Sprite):
         return str(val)
 
 
-class OutlinedText(FancyText):
+class TextWithBackground(FancyText):
 
     CONF = FancyText.CONF.extend({vol.Optional('rgb', default=[0, 0, 0]): vol.Coerce(list),
-                                  vol.Optional('orgb', default=[0, 0, 0]):vol.Coerce(list)})
+                                  vol.Optional('background_rgb', default=[0, 0, 0]): vol.Coerce(list)})
 
     def __init__(self, max_x, max_y, data_source):
         FancyText.__init__(self, max_x, max_y, data_source=data_source)
-        self._rgb = [0, 0, 0]
-        self._orgb = [0, 0, 0]
+        self.rgb = None
+        self.background_rgb = None
 
     def apply_config(self, conf):
         conf = FancyText.apply_config(self, conf)
@@ -374,22 +377,23 @@ class OutlinedText(FancyText):
             text = 'N/A'
         else:
             text = val
-        self.add_text(text, self._rgb, self._orgb)
+        self.add_text(text, self.rgb, self.background_rgb)
 
-    def add_text(self, text, color, outline_color):
-        self._text.append((text, color, outline_color))
+    def add_text(self, text, color, background_color):
+        self._text.append((text, color, background_color))
 
     def render(self, display):
         self.update_text()
         x = 0
         self.tick()
-        for text, rgb, orgb in self._text:
+        for text, rgb, background_color in self._text:
             if callable(text):
                 text = str(text())  # for dynamic values
             r, g, b = rgb
-            out_r, out_g, out_b = orgb
+            background_r, background_g, background_b = background_color
 
-            x += display.outlined_text(self.font, self.x + x, self.y, r, g, b, out_r, out_g, out_b, text)
+            x += display.text_with_background(self.font, self.x + x, self.y, r, g, b,
+                                              background_r, background_g, background_b, text)
         self._width = x
         return x
 
@@ -453,6 +457,7 @@ class Duration(FancyText):  # pylint:disable=too-many-instance-attributes
     def render(self, canvas):
         self.update_color()
         return FancyText.render(self, canvas)
+
 
 class Temperature(Duration):
     """A temperature with color dependent on a high and low bound."""
