@@ -40,7 +40,7 @@ class Driver(object):  # pylint: disable=too-many-instance-attributes
         self.active_scene = None
         self._stop = threading.Event()
         self.interval = 2
-        self._brightness = 100  # just used to detect changes in data. Should be handeled on data.
+        self._brightness = 70  # just used to detect changes in data. Should be handeled on data.
 
     def run(self):
         """
@@ -180,7 +180,7 @@ class Driver(object):  # pylint: disable=too-many-instance-attributes
             self.modes[mode_name] = []
             for sceneinfo in scenelist:
                 for scene_name, scene_params in sceneinfo.items():
-                    self.modes[mode_name].append((scene_name, scene_params['duration'], scene_params['mode_after']))
+                    self.modes[mode_name].append((scene_name, scene_params['duration'], scene_params.get('mode_after')))
 
         self.modes[MODE_ALL] = []  # make a default catch-all mode.
         for scene_name in self.scenes:

@@ -25,14 +25,25 @@ class MQTTClient(object):
         LOG.debug("%s %s", msg.topic, str(msg.payload))
         key = msg.topic.split('/')[-1]
         if key == 'multi':
-            try:
-                values = json.loads(msg.payload)
-                for valueKey, value in values.iteritems():
-                    self._data_container[valueKey] = value
-            except ValueError, e:
-                LOG.debug("Bad JSON", e)
+            self.handle_json_message(msg.payload)
+        elif msg.topic in self.conf['mappings']:
+            LOG.debug("Found topic %s", msg.topic)
+            if msg.payload in self.conf['mappings'][msg.topic]:
+                LOG.debug("Found Handle %s: %s", msg.payload, self.conf['mappings'][msg.topic])
+                self.handle_json_message(self.conf['mappings'][msg.topic][msg.payload])
         else:
             self._data_container[key] = msg.payload
+
+    def handle_json_message(self, payload):
+        try:
+            if isinstance(payload, basestring):
+                values = json.loads(payload)
+            else:
+                values = payload
+            for valueKey, value in values.iteritems():
+                self._data_container[valueKey] = value
+        except ValueError, e:
+            LOG.debug("Bad JSON", e)
 
     def start(self):
         """Connect to the MQTT server."""

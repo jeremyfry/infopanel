@@ -398,6 +398,44 @@ class TextWithBackground(FancyText):
         return x
 
 
+class ColorText(FancyText):
+
+    CONF = FancyText.CONF.extend({vol.Optional('rgb', default=[0, 0, 0]): vol.Coerce(list)})
+
+    def __init__(self, max_x, max_y, data_source):
+        FancyText.__init__(self, max_x, max_y, data_source=data_source)
+        self.rgb = None
+
+    def apply_config(self, conf):
+        conf = FancyText.apply_config(self, conf)
+        self._make_text()
+        return conf
+
+    def _make_text(self):
+        """Make elements of a duration with label and text."""
+        val = self.value  # pylint: disable=not-callable
+        if val is None:
+            text = 'N/A'
+        else:
+            text = val
+        self.add_text(text, self.rgb)
+
+    def add_text(self, text, color):
+        self._text.append((text, color))
+
+    def render(self, display):
+        self.update_text()
+        x = 0
+        self.tick()
+        for text, rgb in self._text:
+            if callable(text):
+                text = str(text())  # for dynamic values
+            r, g, b = rgb
+
+            x += display.text(self.font, self.x + x, self.y, r, g, b, text)
+        self._width = x
+        return x
+
 class Duration(FancyText):  # pylint:disable=too-many-instance-attributes
     """Text that represents a duration with a green-to-red color."""
 
@@ -429,7 +467,8 @@ class Duration(FancyText):  # pylint:disable=too-many-instance-attributes
 
     def _make_text(self):
         """Make elements of a duration with label and text."""
-        FancyText.add(self, self.label_fmt.format(self.label), colors.rgb_from_name('yellow'))
+        if self.label is not None:
+            FancyText.add(self, self.label_fmt.format(self.label), colors.rgb_from_name('yellow'))
         val = self.value() if callable(self.value) else self.value  # pylint: disable=not-callable
         if val is None:
             color = colors.interpolate_color(self.low_val, self.low_val, self.high_val, self.cmap)

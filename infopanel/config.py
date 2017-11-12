@@ -17,7 +17,8 @@ MQTT = vol.Schema({'broker':str,
                    vol.Optional('password'): str,
                    vol.Optional('certificate'): str,
                    vol.Optional('protocol', default='3.1'): vol.Coerce(str),
-                   'topic':str})
+                   'topic':str,
+                   vol.Optional('mappings'): object})
 
 SPRITE = vol.Schema({'type': vol.Any(*SPRITE_NAMES)},
                     extra=vol.ALLOW_EXTRA)
